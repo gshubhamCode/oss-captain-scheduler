@@ -1,9 +1,9 @@
-name: Create RunPod CPU Pod
+name: Create RunPod CPU Pod (static name check)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '5 */2 * * *' # Every 2 hours at minute 5
+    - cron: '5 */2 * * *'  # Every 2 hours at minute 5
 
 jobs:
   create:
@@ -11,6 +11,29 @@ jobs:
     environment: prod
 
     steps:
+      - name: Set static pod name
+        id: set_name
+        run: |
+          POD_NAME="oss-captain-api"
+          echo "pod_name=$POD_NAME" >> $GITHUB_OUTPUT
+
+      - name: Check if pod with same name exists
+        id: check_pod
+        run: |
+          PODS_JSON=$(curl -s -X GET https://rest.runpod.io/v1/pods \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json")
+
+          EXISTS=$(echo "$PODS_JSON" | jq -r --arg NAME "${{ steps.set_name.outputs.pod_name }}" '
+            .pods[] | select(.name == $NAME) | .id' || echo "")
+
+          if [ -n "$EXISTS" ]; then
+            echo "❌ Pod with name '${{ steps.set_name.outputs.pod_name }}' already exists (ID: $EXISTS)."
+            exit 1
+          else
+            echo "✅ No pod with name '${{ steps.set_name.outputs.pod_name }}' found."
+          fi
+
       - name: Create Pod from Template
         id: create_pod
         run: |
@@ -18,7 +41,8 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{
-              "templateId": "${{ secrets.RUNPOD_OSS_CAPTAIN_TEMPLATE_ID }}"
+              "templateId": "${{ secrets.RUNPOD_OSS_CAPTAIN_TEMPLATE_ID }}",
+              "name": "${{ steps.set_name.outputs.pod_name }}"
             }')
 
           echo "API Response: $RESPONSE"
