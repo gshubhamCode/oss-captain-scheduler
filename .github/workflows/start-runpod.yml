@@ -25,7 +25,7 @@ jobs:
             -H "Content-Type: application/json")
 
           EXISTS=$(echo "$PODS_JSON" | jq -r --arg NAME "${{ steps.set_name.outputs.pod_name }}" '
-            .pods[] | select(.name == $NAME) | .id' || echo "")
+            .[] | select(.name == $NAME) | .id' || echo "")
 
           if [ -n "$EXISTS" ]; then
             echo "❌ Pod with name '${{ steps.set_name.outputs.pod_name }}' already exists (ID: $EXISTS)."
