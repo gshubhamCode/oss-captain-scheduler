@@ -1,0 +1,39 @@
+name: Start RunPod Pod
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'  # Every 2 hours
+  workflow_dispatch:        # Optional: allows manual trigger from UI
+
+jobs:
+  start:
+    runs-on: ubuntu-latest
+    environment: prod       # Use your environment to access secrets
+
+    steps:
+      - name: Start RunPod Pod
+        run: |
+          curl -X POST https://rest.runpod.io/v1/pods/${{ secrets.RUNPOD_OSS_CAPTAIN_API_POD_ID }}/start \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json"
+      
+      - name: Wait for Pod to Become RUNNING
+        run: |
+          for i in {1..40}; do
+            STATUS=$(curl -s -X GET https://rest.runpod.io/v1/pods/${{ secrets.RUNPOD_OSS_CAPTAIN_API_POD_ID }} \
+              -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+              | jq -r '.pod.desiredStatus')
+
+            echo "Current Pod Status: $STATUS"
+
+            if [ "$STATUS" = "RUNNING" ]; then
+              echo "✅ Pod is running!"
+              exit 0
+            fi
+
+            echo "⏳ Waiting 30s before checking again..."
+            sleep 30
+          done
+
+          echo "❌ Timed out waiting for pod to start."
+          exit 1
