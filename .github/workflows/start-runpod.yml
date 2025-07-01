@@ -1,39 +1,34 @@
-name: Start RunPod Pod
+name: Create RunPod CPU Pod
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 */2 * * *'  # Every 2 hours
-  workflow_dispatch:        # Optional: allows manual trigger from UI
+    - cron: '5 */2 * * *' # Every 2 hours at minute 5
 
 jobs:
-  start:
+  create:
     runs-on: ubuntu-latest
-    environment: prod       # Use your environment to access secrets
+    environment: prod
 
     steps:
-      - name: Start RunPod Pod
+      - name: Create Pod from Template
+        id: create_pod
         run: |
-          curl -X POST https://rest.runpod.io/v1/pods/${{ secrets.RUNPOD_OSS_CAPTAIN_API_POD_ID }}/start \
+          RESPONSE=$(curl -s -X POST https://rest.runpod.io/v1/pods \
             -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
-            -H "Content-Type: application/json"
-      
-      - name: Wait for Pod to Become RUNNING
-        run: |
-          for i in {1..40}; do
-            STATUS=$(curl -s -X GET https://rest.runpod.io/v1/pods/${{ secrets.RUNPOD_OSS_CAPTAIN_API_POD_ID }} \
-              -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
-              | jq -r '.pod.desiredStatus')
+            -H "Content-Type: application/json" \
+            -d '{
+              "templateId": "${{ secrets.RUNPOD_OSS_CAPTAIN_TEMPLATE_ID }}"
+            }')
 
-            echo "Current Pod Status: $STATUS"
+          echo "API Response: $RESPONSE"
+          
+          POD_ID=$(echo "$RESPONSE" | jq -r '.id')
 
-            if [ "$STATUS" = "RUNNING" ]; then
-              echo "✅ Pod is running!"
-              exit 0
-            fi
+          if [ "$POD_ID" = "null" ] || [ -z "$POD_ID" ]; then
+            echo "❌ Failed to create pod."
+            exit 1
+          fi
 
-            echo "⏳ Waiting 30s before checking again..."
-            sleep 30
-          done
-
-          echo "❌ Timed out waiting for pod to start."
-          exit 1
+          echo "✅ Created Pod ID: $POD_ID"
+          echo "pod_id=$POD_ID" >> $GITHUB_OUTPUT
