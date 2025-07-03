@@ -3,7 +3,7 @@ name: Create RunPod CPU Pod (static name check)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '5 */2 * * *'  # Every 2 hours at minute 5
+    - cron: '0 0,12 * * *'
 
 jobs:
   create:
